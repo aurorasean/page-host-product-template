@@ -1,0 +1,51 @@
+name: Register product3 in page-host
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  register:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout page-host
+        uses: actions/checkout@v4
+        with:
+          repository: aurorasean/page-host
+          token: ${{ secrets.PAT_TOKEN }}
+          path: page-host
+
+      - name: Check if product3 is already registered
+        id: check
+        run: |
+          if grep -qE '^(staging|prod)/product3$' page-host/products.txt; then
+            echo "already_registered=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "already_registered=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create PR to register product3
+        if: steps.check.outputs.already_registered == 'false'
+        env:
+          GH_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          cd page-host
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          BRANCH="register-product3"
+          git checkout -b "$BRANCH"
+          printf '\nstaging/product3\nprod/product3\n' >> products.txt
+          git add products.txt
+          git commit -m "Register product3 in products.txt"
+          git push origin "$BRANCH"
+          gh pr create \
+            --repo aurorasean/page-host \
+            --title "Register product3 in products.txt" \
+            --body "Adds \`staging/product3\` and \`prod/product3\` to \`products.txt\` so that product3 appears on the page-host landing page." \
+            --base main \
+            --head "$BRANCH"
