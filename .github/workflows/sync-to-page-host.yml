@@ -1,0 +1,47 @@
+name: Sync to page-host
+
+on:
+  push:
+    branches:
+      - staging
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout product repo
+        uses: actions/checkout@v4
+
+      - name: Determine target path in page-host
+        id: target
+        run: |
+          if [ "${{ github.ref_name }}" = "staging" ]; then
+            echo "path=staging/product-your-name-here" >> "$GITHUB_OUTPUT"
+          else
+            echo "path=prod/product-your-name-here" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout page-host
+        uses: actions/checkout@v4
+        with:
+          repository: aurorasean/page-host
+          token: ${{ secrets.PAT_TOKEN }}
+          path: page-host
+
+      - name: Copy index.html to page-host
+        run: |
+          mkdir -p "page-host/${{ steps.target.outputs.path }}"
+          cp index.html "page-host/${{ steps.target.outputs.path }}/index.html"
+
+      - name: Commit and push to page-host
+        run: |
+          cd page-host
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "${{ steps.target.outputs.path }}/index.html"
+          git diff --staged --quiet || git commit -m "Update product-your-name-here (${{ steps.target.outputs.path }}) from aurorasean/page-host-product-your-name-here@${{ github.sha }}"
+          git push
